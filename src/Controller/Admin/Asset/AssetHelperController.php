@@ -54,6 +54,7 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  */
 class AssetHelperController extends AdminAbstractController
 {
+
     public function getMyOwnGridColumnConfigs(int $userId, string $classId, string $searchType): array
     {
         $db = Db::get();
@@ -333,10 +334,31 @@ class AssetHelperController extends AdminAbstractController
             $result['locked'] = $field['locked'];
         }
 
-        if ($type === 'select' && $predefined) {
-            $field['fieldConfig']['layout']['config'] = $predefined->getConfig();
+        if ($type === 'select') {
+            if($predefined) {
+                $field['fieldConfig']['layout']['config'] = $predefined->getConfig();
+                $result['layout'] = $field['fieldConfig']['layout'];
+            }
+            else {
+                $eventDispatcher = \Pimcore::getContainer()->get('event_dispatcher');
+                $metadataSelectConfigEvent = new GenericEvent($this, [
+                    'keyPrefix' => $keyPrefix,
+                    'field' => $field
+                ]);
+
+                $eventDispatcher->dispatch($metadataSelectConfigEvent, AdminEvents::ASSET_GET_SELECT_FIELD_GRID_CONFIG);
+                if(isset($metadataSelectConfigEvent['fieldData'])) {
+                    $result['layout'] = $metadataSelectConfigEvent['fieldData'];
+                }
+            }
+        }
+        /*elseif($type === 'select' && method_exists( '\Pimcore\AssetMetadataClassDefinitionsBundle\Model\ClassDefinition\Data\Select','addGridConfig')) {
+            $selectObj1 = new \Pimcore\AssetMetadataClassDefinitionsBundle\Model\ClassDefinition\Data\Select();
+            $selectObj1->addGridConfig($field);
+            $field['fieldConfig']['layout']['config'] = $field['config'];
             $result['layout'] = $field['fieldConfig']['layout'];
-        } elseif ($type === 'document' || $type === 'asset' || $type === 'object') {
+        }*/
+        elseif ($type === 'document' || $type === 'asset' || $type === 'object') {
             $result['layout']['fieldtype'] = 'manyToOneRelation';
             $result['layout']['subtype'] = $type;
         }
@@ -1111,4 +1133,5 @@ class AssetHelperController extends AdminAbstractController
 
         return $this->adminJson(['success' => false, 'message' => 'something went wrong.']);
     }
+
 }
